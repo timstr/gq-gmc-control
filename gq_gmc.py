@@ -40,7 +40,7 @@ DEFAULT_FLASH_SIZE = 0x00100000  # 1 MByte
 DEFAULT_CONFIGURATION_SIZE = 0x100  # 256 byte
 DEFAULT_VERBOSE_LEVEL = 2
 
-EOL = '\n'
+EOL = b'\n'
 
 ADDRESS_WIFI_ON_OFF = 0x00
 ADDRESS_WIFI_SSID = 0x45
@@ -83,22 +83,22 @@ def command_returned_ok():
     ret = ''
     for loop in range(10):
         ret = m_device.read(1)
-        if ret != '':
+        if len(ret) != 0:
             break
 
-    if ret == '' or ord(ret) != 0xaa:
+    if len(ret) == 0 or ret[0] != 0xaa:
         return False
     return True
 
 
 def clear_port():
     # close any pending previous command
-    m_device.write(">>")
+    m_device.write(b">>")
 
     # get rid off all buffered data still in the queue
     while True:
         x = m_device.read(1)
-        if x == '':
+        if len(x) == 0:
             break
 
 
@@ -107,7 +107,7 @@ def check_device_type():
 
     m_device_type = get_device_type()
 
-    if m_device_type == '' or len(m_device_type) < 8:
+    if len(m_device_type) < 8:
         print("ERROR: device not found or supported")
         return -1
 
@@ -137,8 +137,8 @@ def get_device_type():
         print('ERROR: no device connected')
         return ''
 
-    m_device.write('<GETVER>>')
-    return m_device.read(14)
+    m_device.write(b'<GETVER>>')
+    return m_device.read(14).decode("ascii")
 
 
 def get_serial_number():
@@ -146,10 +146,10 @@ def get_serial_number():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETSERIAL>>')
+    m_device.write(b'<GETSERIAL>>')
     serial_number = m_device.read(7)
 
-    if serial_number == '' or len(serial_number) < 7:
+    if len(serial_number) < 7:
         print('WARNING: no valid serial number received')
         return ''
 
@@ -165,11 +165,11 @@ def set_power(on=True):
         return -1
 
     if on:
-        m_device.write('<POWERON>>')
+        m_device.write(b'<POWERON>>')
         if m_verbose == 2:
             print('device power on')
     else:
-        m_device.write('<POWEROFF>>')
+        m_device.write(b'<POWEROFF>>')
         if m_verbose == 2:
             print('device power off')
 
@@ -179,10 +179,10 @@ def get_voltage():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETVOLT>>')
+    m_device.write(b'<GETVOLT>>')
     voltage = m_device.read(3)
 
-    if voltage == '' or len(voltage) < 3:
+    if len(voltage) < 3:
         print('WARNING: no valid voltage received')
         return ''
 
@@ -194,10 +194,10 @@ def get_cpm(cpm_to_usievert=None):
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETCPM>>')
+    m_device.write(b'<GETCPM>>')
     cpm = m_device.read(2)
 
-    if cpm == '' or len(cpm) < 2:
+    if len(cpm) < 2:
         print('WARNING: no valid cpm received')
         return ''
 
@@ -245,10 +245,10 @@ def get_data(address=0x000000, length=None, out_file=DEFAULT_BIN_FILE):
                 (sub_addr >> 8) & 0xff,
                 sub_addr & 0xff,
                 sub_len)
-            m_device.write('<SPIR' + cmd + '>>')
+            m_device.write(b'<SPIR' + cmd + b'>>')
 
             data = m_device.read(sub_len)
-            if data == '' or total_len >= length:
+            if len(data) == 0 or total_len >= length:
                 break
 
             f_out.write(data)
@@ -300,7 +300,7 @@ def print_data(out_file, data_type, c_str, size=1, cpm_to_usievert=None):
     if size < 5:
         c_value = 0
         for i in range(size):
-            c_value = c_value * 256 + ord(c_str[i])
+            c_value = c_value * 256 + c_str[i]
         value = convert_cpm_to_usievert(c_value, data_type, cpm_to_usievert)
 
     else:
@@ -330,7 +330,7 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
 
     while True:
         c_str = f_in.read(1)
-        if c_str == '':
+        if len(c_str) == 0:
             break
         c = ord(c_str)
 
@@ -339,10 +339,10 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
             # command: set count type
             if c == 0x00:
                 data = f_in.read(9)
-                if data == '' or len(data) < 9:
+                if len(data) < 9:
                     break
 
-                save_mode = ord(data[8])
+                save_mode = data[8]
                 if save_mode == 0:
                     data_type = ''
                     mode_str = 'off'
@@ -365,53 +365,53 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
                     data_type = ''
                     mode_str = '[UNKNOWN]'
 
-                f_out.write(',,20%02d/%02d/%02d %02d:%02d:%02d,%s' %
-                    (ord(data[0]), ord(data[1]), ord(data[2]), ord(data[3]),
-                     ord(data[4]), ord(data[5]), mode_str) + EOL)
+                f_out.write(',,20%02d/%02d/%02d %02d:%02d:%02d,%s\n' %
+                    (data[0], data[1], data[2], data[3],
+                     data[4], data[5], mode_str.encode))
 
             # command: two byte value (large numbers)
             elif c == 0x01:
                 data = f_in.read(2)
-                if data == '' or len(data) < 2:
+                if len(data) < 2:
                     break
 
                 value = print_data(f_out, data_type, data, size=2,
                                    cpm_to_usievert=cpm_to_usievert)
-                f_out.write(value + EOL)
+                f_out.write(value + "\n")
 
             # command: three byte value (very large numbers)
             elif c == 0x02:
                 data = f_in.read(3)
-                if data == '' or len(data) < 3:
+                if len(data) < 3:
                     break
 
                 value = print_data(f_out, data_type, data, size=3,
                                    cpm_to_usievert=cpm_to_usievert)
-                f_out.write(value + EOL)
+                f_out.write(value + "\n")
 
             # command: four byte value (huge numbers)
             elif c == 0x03:  # TODO: test me ;)
                 data = f_in.read(4)
-                if data == '' or len(data) < 4:
+                if len(data) < 4:
                     break
 
                 value = print_data(f_out, data_type, data, size=4,
                                    cpm_to_usievert=cpm_to_usievert)
-                f_out.write(value + EOL)
+                f_out.write(value + "\n")
 
             # command: note
             elif c == 0x04:
                 data = f_in.read(1)
-                if data == '':
+                if len(data) == 0:
                     break
 
                 length = ord(data)
                 data = f_in.read(length)
-                f_out.write(',,,,' + data + EOL)
+                f_out.write(',,,,' + data + "\n")
 
             # command: unknown/unsupported
             else:
-                f_out.write(',,,,[%d?]' % c + EOL)
+                f_out.write(',,,,[%d?]' % c + "\n")
 
             marker = 0
             # end of command
@@ -426,7 +426,7 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
             else:
                 # possible command turns out to be a regular value
                 f_out.write(print_data(f_out, data_type, chr(0x55), size=1,
-                                       cpm_to_usievert=cpm_to_usievert) + EOL)
+                                       cpm_to_usievert=cpm_to_usievert) + "\n")
                 marker = 0
         else:
             marker = 0
@@ -439,11 +439,11 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
         value = print_data(f_out, data_type, c_str, size=1,
                            cpm_to_usievert=cpm_to_usievert)
         if value is not None:
-            f_out.write(value + EOL)
+            f_out.write(value + "\n")
 
         # detect end of file, this is needed if the device is still logging but
         # hasn't reached the end of the flash memory yet
-        if ord(c_str[0]) == 0xff:
+        if c_str[0] == 0xff:
             eof_count += 1
             if eof_count == 100:
                 break
@@ -465,7 +465,7 @@ def set_heartbeat(enable, cpm_to_usievert=None):
         return -1
 
     if enable:
-        m_device.write('<HEARTBEAT1>>')
+        m_device.write(b'<HEARTBEAT1>>')
 
         signal.signal(signal.SIGINT, exit_gracefully)
         signal.signal(signal.SIGTERM, exit_gracefully)
@@ -473,7 +473,7 @@ def set_heartbeat(enable, cpm_to_usievert=None):
         try:
             while not m_terminate:
                 cpm = m_device.read(2)
-                if cpm == '':
+                if len(cpm) == 0:
                     continue
                 value = struct.unpack(">H", cpm)[0] & 0x3fff
 
@@ -492,14 +492,14 @@ def set_heartbeat(enable, cpm_to_usievert=None):
             pass
         finally:
             # make sure we stop the heartbeat
-            m_device.write('<HEARTBEAT0>>')
+            m_device.write(b'<HEARTBEAT0>>')
 
     else:
-        m_device.write('<HEARTBEAT0>>')
+        m_device.write(b'<HEARTBEAT0>>')
         while True:
             x = m_device.read(1)
             sys.stdout.write('.')
-            if x == '':
+            if len(x) == 0:
                 break
         if m_verbose == 2:
             print("ok")
@@ -510,10 +510,10 @@ def get_temperature():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETTEMP>>')
+    m_device.write(b'<GETTEMP>>')
     temp = m_device.read(4)
 
-    if temp == '' or len(temp) < 4:
+    if len(temp) < 4:
         print('WARNING: no valid temperature received')
         return ''
 
@@ -530,10 +530,10 @@ def get_gyro():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETGYRO>>')
+    m_device.write(b'<GETGYRO>>')
     gyro = m_device.read(7)
 
-    if gyro == '' or len(gyro) < 7:
+    if len(gyro) < 7:
         print('WARNING: no valid gyro data received')
         return ''
 
@@ -553,10 +553,10 @@ def get_config():
     else:
         size = DEFAULT_CONFIGURATION_SIZE
 
-    m_device.write('<GETCFG>>')
+    m_device.write(b'<GETCFG>>')
     data = m_device.read(size)
 
-    if data == '' or len(data) == 0:
+    if len(data) == 0:
         print("WARNING: reading device configuration failed")
         return -1
 
@@ -657,7 +657,7 @@ def write_config(parameters):
             print("WARNING: parameter with name '{}' not supported".format(par_value[0]))
 
     # erase all stored parameters in flash
-    m_device.write('<ECFG>>')
+    m_device.write(b'<ECFG>>')
     if not command_returned_ok():
         print("WARNING: erase operation failed, parameters not stored on device")
         return
@@ -670,12 +670,12 @@ def write_config(parameters):
     # write all cached parameters (from memory) into the device
     for i in range(size):
         cmd = struct.pack('>' + address_size + 'B', i, ord(m_config_data[i]))
-        m_device.write('<WCFG' + cmd + '>>')
+        m_device.write(b'<WCFG' + cmd + '>>')
         if not command_returned_ok():
             print("WARNING: write operation failed at address 0x%02X, (some) parameters not stored to device" % i)
 
     # make the change permanent (write flash)
-    m_device.write('<CFGUPDATE>>')
+    m_device.write(b'<CFGUPDATE>>')
     if not command_returned_ok():
         print("WARNING: update operation failed, parameters not stored on device")
         return
@@ -686,10 +686,10 @@ def get_date_and_time():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<GETDATETIME>>')
+    m_device.write(b'<GETDATETIME>>')
     date = m_device.read(7)
 
-    if date == '' or len(date) < 7:
+    if len(date) < 7:
         print('WARNING: no valid date received')
         return ''
 
@@ -709,7 +709,7 @@ def set_date_and_time(date_time):
                       date_time.hour,
                       date_time.minute,
                       date_time.second)
-    m_device.write('<SETDATETIME' + cmd + '>>')
+    m_device.write(b'<SETDATETIME' + cmd + '>>')
 
     if not command_returned_ok():
         print("WARNING: setting date and time not succeded")
@@ -721,16 +721,16 @@ def send_key(key):
         return -1
 
     if key.lower() == 's1':
-        m_device.write('<KEY0>>')
+        m_device.write(b'<KEY0>>')
 
     elif key.lower() == 's2':
-        m_device.write('<KEY1>>')
+        m_device.write(b'<KEY1>>')
 
     elif key.lower() == 's3':
-        m_device.write('<KEY2>>')
+        m_device.write(b'<KEY2>>')
 
     elif key.lower() == 's4':
-        m_device.write('<KEY3>>')
+        m_device.write(b'<KEY3>>')
 
 
 def firmware_update():
@@ -742,7 +742,7 @@ def factory_reset():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<FACTORYRESET>>')
+    m_device.write(b'<FACTORYRESET>>')
 
     if not command_returned_ok():
         print("WARNING: factory reset not succeded")
@@ -753,7 +753,7 @@ def reboot():
         print('ERROR: no device connected')
         return -1
 
-    m_device.write('<REBOOT>>')
+    m_device.write(b'<REBOOT>>')
 
 
 def dump_data(data):
