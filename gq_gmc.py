@@ -425,7 +425,7 @@ def parse_data_file(in_file=DEFAULT_BIN_FILE, out_file=DEFAULT_CSV_FILE,
                 continue
             else:
                 # possible command turns out to be a regular value
-                f_out.write(print_data(f_out, data_type, chr(0x55), size=1,
+                f_out.write(print_data(f_out, data_type, b"7", size=1,
                                        cpm_to_usievert=cpm_to_usievert) + "\n")
                 marker = 0
         else:
